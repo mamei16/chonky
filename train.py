@@ -75,8 +75,8 @@ def main(dataset_id, model_id, output_dir, batch_size, max_seq_len=None):
     def tokenize_and_align_labels(examples):
         tokenized_inputs = tokenizer(
             examples["tokens"],
-            truncation=True,  # TODO: Is truncating to max_seq_len really the way to do it? https://stackoverflow.com/questions/65246703/how-does-max-length-padding-and-truncation-arguments-work-in-huggingface-bertt#65255500
-            is_split_into_words=True, # https://discuss.huggingface.co/t/token-classification-how-to-tokenize-and-align-labels-with-overflow-and-stride/4353/4
+            truncation=True,
+            is_split_into_words=True,
             max_length=max_seq_len,
         )
 

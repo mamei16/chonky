@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from datasets import Dataset, IterableDataset, load_from_disk
 from tqdm import tqdm
+import regex
 
 
 def dataset_dict_gen(path):
@@ -11,7 +12,7 @@ def dataset_dict_gen(path):
     ids = ds.to_iterable_dataset()
 
     for datum_dict in tqdm(ids, total=len(ds)): #ds["text"]:
-        paragraphs = list(filter(len, datum_dict["text"].split("\n\n"))) #list(filter(len, datum_dict["text"].split(".\n\n")))
+        paragraphs = list(filter(len, regex.split("(?<!:)\n\n", datum_dict["text"]))) #list(filter(len, datum_dict["text"].split(".\n\n")))
 
         tokens = []
         ner_tags = []

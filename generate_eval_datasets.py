@@ -11,17 +11,32 @@ def dataset_dict_gen(path):
     ds = load_from_disk(path)
     ids = ds.to_iterable_dataset()
 
-    for datum_dict in tqdm(ids, total=len(ds)): #ds["text"]:
-        paragraphs = list(filter(len, regex.split("(?<!:)\n\n", datum_dict["text"]))) #list(filter(len, datum_dict["text"].split(".\n\n")))
+    for datum_dict in tqdm(ids, total=len(ds)):
+        paragraphs = regex.split("(?<!:)\n\n", datum_dict["text"])
 
         tokens = []
         ner_tags = []
 
         for para in paragraphs:
-            for token in para.split(" "):
+            stripped_para = para.strip()
+            if stripped_para == "References":
+                break
+            if len(stripped_para) == 0:
+                continue
+            para_splits = para.split(" ")
+            for token in para_splits:
                 tokens.append(token)
                 ner_tags.append(0)
-            ner_tags[-1] = 1
+            # TODO: How to deal with series of consecutive ones?
+            #if ner_tags[-2] == 1:
+            #    ner_tags[-2] = 0
+            if len(para_splits) > 1:
+                ner_tags[-1] = 1
+
+        if not ner_tags:
+            continue
+
+        ner_tags[-1] = 0
 
         yield {"tokens": tokens, "ner_tags": ner_tags}
 

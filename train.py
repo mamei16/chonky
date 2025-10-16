@@ -135,8 +135,8 @@ def main(dataset_id, model_id, output_dir, batch_size, max_seq_len=None):
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        #num_train_epochs=1,
-        max_steps=18000,
+        num_train_epochs=1,
+        #max_steps=18000,
         weight_decay=0.01,
         eval_strategy="steps",
         save_strategy="steps",
@@ -166,7 +166,7 @@ def main(dataset_id, model_id, output_dir, batch_size, max_seq_len=None):
 
 if __name__ == "__main__":
     main(
-        dataset_id="mamei16/wikipedia_paragraphs_token_classification",
+        dataset_id="mamei16/wikipedia_paragraphs",
         model_id="mirth/chonky_distilbert_base_uncased_1",
         output_dir="chonky_distilbert_base_uncased_1.1",
         batch_size=64,

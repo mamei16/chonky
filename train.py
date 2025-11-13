@@ -1,16 +1,49 @@
+from typing import Optional, Union
+from dataclasses import field, dataclass
+
 import numpy as np
 import torch
 import evaluate
-from datasets import load_from_disk, load_dataset
+from datasets import load_from_disk, load_dataset, Dataset
+import datasets
 from transformers import (
     AutoTokenizer,
     AutoModelForTokenClassification,
     TrainingArguments,
     Trainer,
-    DataCollatorForTokenClassification,
+    DataCollatorForTokenClassification, is_torch_xla_available,
 )
+from transformers.trainer_utils import SaveStrategy
+
+if is_torch_xla_available():
+    import torch_xla.core.xla_model as xm
+
 
 torch.set_float32_matmul_precision("high")
+torch.backends.cuda.matmul.allow_tf32 = True
+
+
+DATASET_NAMES = ["bn", "bpy", "zh", "zh-classical", "ht", "ky", "new", "nn", "no", "fa", "fy", "af", "sq", "ar", "an",
+                 "hy", "ast", "az", "ba", "eu", "bar", "be", "bs", "br", "bg", "my", "ca", "ce", "cv", "hr", "cs", "da",
+                 "nl", "en", "et", "fi", "fr", "gl", "ka", "de", "el", "gu", "he", "hi", "hu", "is", "io", "id", "ga",
+                 "it", "ja", "jv", "kn", "kk", "ko", "la", "lv", "lt", "lmo", "nds-nl", "lb", "mk", "mg", "ms", "ml",
+                 "mr", "min", "ne", "oc", "pms", "pl", "pt", "pa", "ro", "ru", "sco", "sr", "sh", "scn", "sk", "sl",
+                 "azb", "es", "su", "sw", "tl", "tg", "ta", "tt", "te", "tr", "uk", "ur", "uz", "vi", "vo", "cy", "pnb",
+                 "yo", "th", "mn", "ceb", "war", "sv"]
+
+FULL_DATASET_NAMES = ["Bangla", "Bishnupriya", "Chinese", "Classical Chinese", "Haitian Creole", "Kyrgyz", "Newari",
+                      "Norwegian Nynorsk", "Norwegian", "Persian", "Western Frisian", "Afrikaans", "Albanian", "Arabic",
+                      "Aragonese", "Armenian", "Asturian", "Azerbaijani", "Bashkir", "Basque", "Bavarian", "Belarusian",
+                      "Bosnian", "Breton", "Bulgarian", "Burmese", "Catalan", "Chechen", "Chuvash", "Croatian", "Czech",
+                      "Danish", "Dutch", "English", "Estonian", "Finnish", "French", "Galician", "Georgian", "German",
+                      "Greek", "Gujarati", "Hebrew", "Hindi", "Hungarian", "Icelandic", "Ido", "Indonesian", "Irish",
+                      "Italian", "Japanese", "Javanese", "Kannada", "Kazakh", "Korean", "Latin", "Latvian", "Lithuanian",
+                      "Lombard", "Low Saxon", "Luxembourgish", "Macedonian", "Malagasy", "Malay", "Malayalam", "Marathi",
+                      "Minangkabau", "Nepali", "Occitan", "Piedmontese", "Polish", "Portuguese", "Punjabi", "Romanian",
+                      "Russian", "Scots", "Serbian", "Serbo-Croatian", "Sicilian", "Slovak", "Slovenian",
+                      "South Azerbaijani", "Spanish", "Sundanese", "Swahili", "Tagalog", "Tajik", "Tamil", "Tatar",
+                      "Telugu", "Turkish", "Ukrainian", "Urdu", "Uzbek", "Vietnamese", "Volapük", "Welsh",
+                      "Western Punjabi", "Yoruba", "Thai", "Mongolian", "Cebuano", "Waray", "Swedish"]
 
 
 def distilbert(model_name):
@@ -54,54 +87,97 @@ def modernbert(model_id):
 
     return model, tokenizer
 
+@dataclass
+class CustomEvalTrainingArguments(TrainingArguments):
+    full_eval_steps: Optional[float] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Run an evaluation on a extra validation set every X steps. "
+                "Should be an integer."
+            )
+        },
+    )
 
-def main(dataset_id, model_id, output_dir, batch_size, max_seq_len=None):
+class CustomEvalTrainer(Trainer):
+    def __init__(self, full_eval_dataset: Optional[Union[Dataset, dict[str, Dataset], "datasets.Dataset"]] = None,
+                 **kwargs):
+        self.full_eval_dataset = full_eval_dataset
+        super().__init__(**kwargs)
+
+    def _maybe_log_save_evaluate(
+            self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, start_time, learning_rate=None
+    ):
+        if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
+            if is_torch_xla_available():
+                xm.mark_step()
+
+            logs: dict[str, float] = {}
+
+            # all_gather + mean() to get average loss over all processes
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            # reset tr_loss to zero
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            if grad_norm is not None:
+                logs["grad_norm"] = grad_norm.item() if isinstance(grad_norm, torch.Tensor) else grad_norm
+            if learning_rate is not None:
+                logs["learning_rate"] = learning_rate
+            else:
+                logs["learning_rate"] = self._get_learning_rate()
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.log(logs, start_time)
+
+        metrics = None
+        if self.control.should_evaluate:
+            metrics = self._evaluate(trial, ignore_keys_for_eval)
+
+        if (self.full_eval_dataset and self.args.full_eval_steps and
+            self.state.global_step % self.args.full_eval_steps == 0):
+            metrics = self.evaluate(eval_dataset=self.full_eval_dataset)
+
+            f1_scores = np.array([metrics[metric] for metric in metrics.keys() if metric.endswith("f1")])
+            mean_f1 = np.mean(f1_scores)
+            std_f1 = np.std(f1_scores)
+            median_f1 = np.median(f1_scores)
+
+            accumulated_metrics = {"eval_acc_mean_f1": mean_f1.item(),
+                                   "eval_acc_std_f1": std_f1.item(),
+                                   "eval_acc_median_f1": median_f1.item()}
+            self.log(accumulated_metrics)
+
+            is_new_best_metric = self._determine_best_metric(metrics=accumulated_metrics, trial=trial)
+
+            if self.args.save_strategy == SaveStrategy.BEST:
+                self.control.should_save = is_new_best_metric
+
+
+        if self.control.should_save:
+            self._save_checkpoint(model, trial)
+            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+
+
+def main(dataset_id, model_id, output_dir, batch_size):
     #model, tokenizer = modernbert(model_id=model_id)
     model, tokenizer = distilbert(model_name=model_id)
 
-    if max_seq_len is None:
-        max_seq_len = tokenizer.model_max_length
+    dataset_train = load_dataset(dataset_id, "all_combined_train", num_proc=16)["train"]
+    print(dataset_train)
 
-    dataset = load_dataset(dataset_id)
-    print(dataset)
-    dataset_val = dataset["validation"]
-    dataset_val = dataset_val.shuffle(seed=42)
-    dataset_val = dataset_val.select(range(10000))
-    dataset_train = dataset["train"]
-    del dataset
+    fast_eval_dataset_dict = {}
+    full_eval_dataset_dict = {}
+    for language_code, full_name in zip(DATASET_NAMES, FULL_DATASET_NAMES):
+        fast_eval_dataset_dict[f"fast_{full_name}"] = load_dataset(dataset_id, language_code, split="fast_val")
+        full_eval_dataset_dict[f"full_{full_name}"] = load_dataset(dataset_id, language_code, split="full_val")
+
     label_list = ["O", "separator"]
     seqeval = evaluate.load("seqeval")
-
-    def tokenize_and_align_labels(examples):
-        tokenized_inputs = tokenizer(
-            examples["tokens"],
-            truncation=True,
-            is_split_into_words=True,
-            max_length=max_seq_len,
-        )
-
-        labels = []
-        for i, label in enumerate(examples["ner_tags"]):
-            word_ids = tokenized_inputs.word_ids(
-                batch_index=i
-            )  # Map tokens to their respective word.
-            previous_word_idx = None
-            label_ids = []
-            for word_idx in word_ids:  # Set the special tokens to -100.
-                if word_idx is None:
-                    label_ids.append(-100)
-                elif (
-                    word_idx != previous_word_idx
-                ):  # Only label the first token of a given word.
-                    label_ids.append(label[word_idx])
-                else:
-                    label_ids.append(-100)
-                previous_word_idx = word_idx
-            labels.append(label_ids)
-
-        tokenized_inputs["labels"] = labels
-
-        return tokenized_inputs
 
     def compute_metrics(p):
         predictions, labels = p
@@ -124,38 +200,41 @@ def main(dataset_id, model_id, output_dir, batch_size, max_seq_len=None):
             "accuracy": results["overall_accuracy"],
         }
 
-    tokenized_dataset_train = dataset_train.map(tokenize_and_align_labels, batched=True, num_proc=16)
-    del dataset_train
-    tokenized_dataset_val = dataset_val.map(tokenize_and_align_labels, batched=True, num_proc=16)
-    del dataset_val
 
     data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
-    training_args = TrainingArguments(
+    training_args = CustomEvalTrainingArguments(
         output_dir=output_dir,
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         num_train_epochs=1,
-        #max_steps=18000,
         weight_decay=0.01,
         eval_strategy="steps",
+        eval_steps=1000,
+        full_eval_steps=10000,
         save_strategy="steps",
-        save_steps=1000,
+        save_steps=5000,
         load_best_model_at_end=True,
         push_to_hub=True,
-        hub_strategy="checkpoint",
+        hub_strategy="every_save",
         hub_token="",
         fp16=True,
         eval_on_start=True,
         save_total_limit=5,
-        metric_for_best_model="f1"
+        save_only_model=True,
+        metric_for_best_model="eval_acc_mean_f1",
+        label_smoothing_factor=0.1,
+        report_to=["tensorboard"],
+        torch_compile=True,
+        dataloader_num_workers=2
     )
 
-    trainer = Trainer(
+    trainer = CustomEvalTrainer(
         model=model,
         args=training_args,
-        train_dataset=tokenized_dataset_train,
-        eval_dataset=tokenized_dataset_val,
+        train_dataset=dataset_train,
+        eval_dataset=fast_eval_dataset_dict,
+        full_eval_dataset=full_eval_dataset_dict,
         processing_class=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
@@ -166,9 +245,8 @@ def main(dataset_id, model_id, output_dir, batch_size, max_seq_len=None):
 
 if __name__ == "__main__":
     main(
-        dataset_id="mamei16/wikipedia_paragraphs",
-        model_id="mirth/chonky_distilbert_base_uncased_1",
-        output_dir="chonky_distilbert_base_uncased_1.1",
-        batch_size=64,
-        max_seq_len=512,
+        dataset_id="mamei16/multilingual-wikipedia-paragraphs",
+        model_id="distilbert/distilbert-base-multilingual-cased",
+        output_dir="chonky_distilbert-base-multilingual-cased",
+        batch_size=64
     )

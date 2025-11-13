@@ -1,0 +1,100 @@
+{
+  "Clusters": [
+    {
+      "Name": "West Germanic",
+      "Languages": ["English", "German", "Dutch", "Scots", "Afrikaans", "Luxembourgish", "Low Saxon", "Bavarian", "Lombard"],
+      "FastEvalPerLanguage": 450,
+      "FullEvalPerLanguage": 1600
+    },
+    {
+      "Name": "North Germanic",
+      "Languages": ["Danish", "Norwegian", "Norwegian Nynorsk", "Swedish", "Icelandic"],
+      "FastEvalPerLanguage": 400,
+      "FullEvalPerLanguage": 1400
+    },
+    {
+      "Name": "Romance West",
+      "Languages": ["French", "Spanish", "Portuguese", "Italian", "Catalan", "Galician", "Occitan", "Asturian", "Aragonese", "Sicilian", "Piedmontese", "Romanian"],
+      "FastEvalPerLanguage": 350,
+      "FullEvalPerLanguage": 1400
+    },
+    {
+      "Name": "Slavic (Latin script)",
+      "Languages": ["Polish", "Czech", "Slovak", "Slovenian", "Croatian", "Bosnian", "Macedonian", "Albanian", "Serbo-Croatian"],
+      "FastEvalPerLanguage": 450,
+      "FullEvalPerLanguage": 1600
+    },
+    {
+      "Name": "Slavic (Cyrillic script)",
+      "Languages": ["Russian", "Ukrainian", "Belarusian", "Bulgarian", "Serbian"],
+      "FastEvalPerLanguage": 450,
+      "FullEvalPerLanguage": 1600
+    },
+    {
+      "Name": "Turkic + Caucasian",
+      "Languages": ["Turkish", "Azerbaijani", "South Azerbaijani", "Uzbek", "Kazakh", "Kyrgyz", "Bashkir", "Tatar", "Chuvash", "Chechen", "Mongolian"],
+      "FastEvalPerLanguage": 500,
+      "FullEvalPerLanguage": 1800
+    },
+    {
+      "Name": "Indic (Indo-Aryan + Dravidian + Tibeto-Burman)",
+      "Languages": ["Hindi", "Urdu", "Bangla", "Gujarati", "Marathi", "Punjabi", "Western Punjabi", "Bishnupriya", "Nepali", "Tamil", "Telugu", "Kannada", "Malayalam", "Newari"],
+      "FastEvalPerLanguage": 600,
+      "FullEvalPerLanguage": 2400
+    },
+    {
+      "Name": "Semitic + Iranian + Caucasian",
+      "Languages": ["Arabic", "Hebrew", "Persian", "Tajik", "Greek", "Armenian", "Georgian"],
+      "FastEvalPerLanguage": 450,
+      "FullEvalPerLanguage": 1700
+    },
+    {
+      "Name": "East Asian (excluding Korean)",
+      "Languages": ["Chinese", "Classical Chinese", "Japanese", "Burmese"],
+      "FastEvalPerLanguage": 900,
+      "FullEvalPerLanguage": 3000
+    },
+    {
+      "Name": "Uralic + Baltic",
+      "Languages": ["Finnish", "Estonian", "Hungarian", "Lithuanian", "Latvian"],
+      "FastEvalPerLanguage": 425,
+      "FullEvalPerLanguage": 1600
+    },
+    {
+      "Name": "Celtic + Minor European",
+      "Languages": ["Irish", "Welsh", "Breton", "Basque", "Western Frisian", "Ido", "Volapük", "Latin"],
+      "FastEvalPerLanguage": 375,
+      "FullEvalPerLanguage": 1500
+    },
+    {
+      "Name": "African + Austronesian + Other (excluding Cebuano, Thai, Waray)",
+      "Languages": ["Swahili", "Malagasy", "Yoruba", "Haitian Creole", "Tagalog", "Javanese", "Sundanese", "Minangkabau", "Indonesian", "Malay", "Vietnamese"],
+      "FastEvalPerLanguage": 500,
+      "FullEvalPerLanguage": 1800
+    },
+    {
+      "Name": "Korean (outlier)",
+      "Languages": ["Korean"],
+      "FastEvalPerLanguage": 900,
+      "FullEvalPerLanguage": 3000
+    },
+    {
+      "Name": "Cebuano (outlier)",
+      "Languages": ["Cebuano"],
+      "FastEvalPerLanguage": 900,
+      "FullEvalPerLanguage": 3000
+    },
+    {
+      "Name": "Thai (outlier)",
+      "Languages": ["Thai"],
+      "FastEvalPerLanguage": 900,
+      "FullEvalPerLanguage": 3000
+    },
+    {
+      "Name": "Waray (outlier)",
+      "Languages": ["Waray"],
+      "FastEvalPerLanguage": 900,
+      "FullEvalPerLanguage": 3000
+    }
+  ]
+}

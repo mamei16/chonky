@@ -1,5 +1,5 @@
 from typing import List
-from attr import dataclass
+from dataclasses import dataclass
 
 import torch
 import numpy as np

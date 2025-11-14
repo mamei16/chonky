@@ -35,6 +35,7 @@ class ParagraphSplitter:
         super().__init__()
         self.device = device
         self.is_modernbert = model_id.startswith("mirth/chonky_modernbert")
+        self.is_mmBERT = model_id == "mirth/chonky_mmbert_small_multilingual_1"
 
         id2label = {
             0: "O",
@@ -45,7 +46,7 @@ class ParagraphSplitter:
             "separator": 1,
         }
 
-        if self.is_modernbert:
+        if self.is_modernbert or self.is_mmBERT:
             tokenizer_kwargs = {"model_max_length": 1024}
         else:
             tokenizer_kwargs = {}
@@ -117,6 +118,8 @@ class ParagraphSplitter:
             # If current separator token is part of a bigger contiguous token, move to the end of the bigger token
             while (current_sep_token.end == next_token.start and
                    (not self.is_modernbert or (current_sep_token.decoded_str != '\n'
+                                               and not next_token.decoded_str.startswith(' '))) and
+                   (not self.is_mmBERT or (not current_sep_token.decoded_str.startswith('\n')
                                                and not next_token.decoded_str.startswith(' ')))):
                 current_sep_token = next_token
                 next_token = flat_tokens[current_sep_token.index+1]

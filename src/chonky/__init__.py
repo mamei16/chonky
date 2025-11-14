@@ -31,7 +31,7 @@ class Token:
 
 
 class ParagraphSplitter:
-    def __init__(self, model_id="mirth/chonky_distilbert_base_uncased_1", device="cpu", model_cache_dir: str = None):
+    def __init__(self, model_id="mamei16/chonky_distilbert-base-multilingual-cased", device="cpu", model_cache_dir: str = None):
         super().__init__()
         self.device = device
         self.is_modernbert = model_id.startswith("mirth/chonky_modernbert")
@@ -78,9 +78,9 @@ class ParagraphSplitter:
         ids_plus = self.tokenizer(text, truncation=True, add_special_tokens=True, return_offsets_mapping=True,
                                   return_overflowing_tokens=True, stride=window_step_size)
 
-        tokens = [[Token(i*max_seq_len+j,
+        tokens = [[Token(i * max_seq_len + j,
                          offset_tup[0], offset_tup[1],
-                         offset_tup[1]-offset_tup[0],
+                         offset_tup[1] - offset_tup[0],
                          text[offset_tup[0]:offset_tup[1]]) for j, offset_tup in enumerate(offset_list)]
                   for i, offset_list in enumerate(ids_plus["offset_mapping"])]
 
@@ -107,30 +107,29 @@ class ParagraphSplitter:
         flat_tokens = [token for window in tokens for token in window]
         sorted_separator_tokens = sorted(all_separator_tokens, key=lambda x: x.start)
         separator_indices = []
-        for i in range(len(sorted_separator_tokens)-1):
+        num_sep_tokens = len(sorted_separator_tokens)
+        for i in range(num_sep_tokens):
             current_sep_token = sorted_separator_tokens[i]
             if current_sep_token.end == 0:
                 continue
-            next_sep_token = sorted_separator_tokens[i+1]
             # next_token is the token succeeding current_sep_token in the original text
-            next_token = flat_tokens[current_sep_token.index+1]
+            next_token = flat_tokens[current_sep_token.index + 1]
 
             # If current separator token is part of a bigger contiguous token, move to the end of the bigger token
             while (current_sep_token.end == next_token.start and
                    (not self.is_modernbert or (current_sep_token.decoded_str != '\n'
                                                and not next_token.decoded_str.startswith(' '))) and
                    (not self.is_mmBERT or (not current_sep_token.decoded_str.startswith('\n')
-                                               and not next_token.decoded_str.startswith(' ')))):
+                                           and not next_token.decoded_str.startswith(' ')))):
                 current_sep_token = next_token
-                next_token = flat_tokens[current_sep_token.index+1]
+                next_token = flat_tokens[current_sep_token.index + 1]
 
-            if ((current_sep_token.start + current_sep_token.length) > next_sep_token.start or
-                ((next_sep_token.end - current_sep_token.end) <= 1)):
-                continue
+            if i < num_sep_tokens - 1:
+                next_sep_token = sorted_separator_tokens[i + 1]
+                if ((current_sep_token.start + current_sep_token.length) > next_sep_token.start or
+                        ((next_sep_token.end - current_sep_token.end) <= 1)):
+                    continue
 
             separator_indices.append(current_sep_token.end)
-
-        if sorted_separator_tokens:
-            separator_indices.append(sorted_separator_tokens[-1].end)
 
         yield from self.split_into_semantic_chunks(text, separator_indices)

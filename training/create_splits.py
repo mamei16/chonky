@@ -44,8 +44,6 @@ full_val_datasets = []
 test_datasets = []
 
 for name in dataset_names:
-    if name == "bn":
-        continue
     language_full_name = code_to_lang[name]
     print(name, language_full_name)
 

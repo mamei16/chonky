@@ -5,23 +5,11 @@ import lzma
 from datasets import load_dataset
 import numpy as np
 
-
-def rmdir(directory):
-    directory = Path(directory)
-    for item in directory.iterdir():
-        if item.is_dir():
-            rmdir(item)
-        else:
-            item.unlink()
-    directory.rmdir()
+from utils import get_dataset_names, get_lang_to_last_line, SPLIT_PATTERN, ENDS_WITH_PERIOD_PATTERN, rmdir
 
 
-with open("langs_to_keep.txt", "r") as f:
-    dataset_names = list(filter(len, f.read().split('\n')))
-
-
-with open("translated_most_common_last_lines.json", "r") as f:
-    lang_to_last_lines = json.load(f)
+dataset_names = get_dataset_names()
+lang_to_last_lines = get_lang_to_last_line()
 
 with lzma.open("lsjbot_dicts.json.xz", "rb") as archive:
         json_bytes = archive.read()
@@ -36,7 +24,7 @@ def is_not_long_short(datum_dict):
     Removes articles whose mean paragraph length is below 30 chars
     or whose median paragraph length is over 1500.
     """
-    split_lens = [len(s) for s in datum_dict["text"].split("\n\n") if s.strip()]
+    split_lens = [len(s) for s in SPLIT_PATTERN.split(datum_dict["text"]) if s.strip()]
     mean_len = np.mean(split_lens)
     median_len = np.median(split_lens)
     return median_len < 1500 and mean_len > 30
@@ -46,12 +34,12 @@ def more_than_two_paras(d, last_lines_dict):
     """
     Filter extremely short articles with less than 2 "real" paragraphs
     """
-    splits = d["text"].split("\n\n")
+    splits = SPLIT_PATTERN.split(d["text"])
     real_paragraph_count = 0
     for split in splits:
         if split.strip() in last_lines_dict:
             break
-        if split.rstrip().endswith(".") or len(split) > 50:
+        if ENDS_WITH_PERIOD_PATTERN.match(split.rstrip()) or len(split) > 50:
             real_paragraph_count += 1
         if real_paragraph_count >= 2:
             break

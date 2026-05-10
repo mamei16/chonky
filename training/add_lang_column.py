@@ -4,22 +4,10 @@ import json
 from datasets import load_dataset
 import numpy as np
 
+from utils import get_dataset_names, rmdir
 
 
-def rmdir(directory):
-    directory = Path(directory)
-    for item in directory.iterdir():
-        if item.is_dir():
-            rmdir(item)
-        else:
-            item.unlink()
-    directory.rmdir()
-
-
-with open("langs_to_keep.txt", "r") as f:
-    dataset_names = list(filter(len, f.read().split('\n')))
-
-
+dataset_names = get_dataset_names()
 
 for name in dataset_names:
     ds = load_dataset("data/wikipedia_shuffled/" + "20231101." + name)

@@ -7,6 +7,7 @@ from datasets import load_dataset, interleave_datasets, load_from_disk, Dataset
 import numpy as np
 from tqdm import tqdm
 
+from utils import get_dataset_names, rmdir
 
 
 class _DatasetGeneratorPickleHack:
@@ -27,19 +28,7 @@ def _DatasetGeneratorPickleHack_raise(*args, **kwargs):
     raise AssertionError("cannot actually unpickle _DatasetGeneratorPickleHack!")
 
 
-def rmdir(directory):
-    directory = Path(directory)
-    for item in directory.iterdir():
-        if item.is_dir():
-            rmdir(item)
-        else:
-            item.unlink()
-    directory.rmdir()
-
-
-with open("langs_to_keep.txt", "r") as f:
-    dataset_names = list(filter(len, f.read().split('\n')))
-
+dataset_names = get_dataset_names()
 
 code_to_lang = {}
 with open("wikipedia_language_codes.txt", "r") as f:

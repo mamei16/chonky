@@ -1,34 +1,15 @@
 import os.path
-from operator import itemgetter
-from collections import defaultdict
-import json
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-from datasets import Dataset, IterableDataset, load_from_disk, Value, Features, List
+from datasets import Dataset, load_from_disk, Value, Features, List
 from tqdm import tqdm
-import regex
 from transformers import AutoTokenizer
 
-
-def rmdir(directory):
-    directory = Path(directory)
-    for item in directory.iterdir():
-        if item.is_dir():
-            rmdir(item)
-        else:
-            item.unlink()
-    directory.rmdir()
+from utils import get_dataset_names, get_lang_to_last_line, rmdir, SPLIT_PATTERN
 
 
-with open("langs_to_keep.txt", "r") as f:
-    dataset_names = list(filter(len, f.read().split('\n')))
-
-
-with open("translated_most_common_last_lines.json", "r") as f:
-    lang_to_last_lines = json.load(f)
-
+dataset_names = get_dataset_names()
+lang_to_last_lines = get_lang_to_last_line()
 
 tokenizer = AutoTokenizer.from_pretrained("distilbert/distilbert-base-multilingual-cased")
 
@@ -70,7 +51,7 @@ def dataset_dict_gen(path):
     ids = ds.to_iterable_dataset()
 
     for datum_dict in tqdm(ids, total=len(ds)):
-        paragraphs = regex.split("(?<!:)\n\n", datum_dict["text"])
+        paragraphs = SPLIT_PATTERN.split(datum_dict["text"])
 
         if len(paragraphs) < 2:
             continue
@@ -99,7 +80,8 @@ def dataset_dict_gen(path):
 
         ner_tags[-1] = 0
 
-        yield {"tokens": tokens, "ner_tags": ner_tags}
+        if any(ner_tags):
+            yield {"tokens": tokens, "ner_tags": ner_tags}
 
 
 def main():
